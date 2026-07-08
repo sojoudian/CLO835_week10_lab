@@ -51,7 +51,7 @@ kubectl get all -n week8
 
 kubectl port-forward fortune 8080:80 -n week8     # leave running; use a 2nd SSH session
 
-ssh -i key.pem -L 8080:127.0.0.1:8080 ubuntu@IP
+ssh -i key.pem -L 8080:127.0.0.1:8080 ubuntu@<MASTER_PUBLIC_IP>
 
 curl http://localhost:8080                        # a fortune; repeat after ~10s — it changes
 
@@ -67,7 +67,6 @@ kubectl get svc -n week8                          # note the 3xxxx port
 # Browse http://<WORKER-1-PUBLIC-IP>:<NODEPORT> and http://<WORKER-2-PUBLIC-IP>:<NODEPORT>
 # Both respond, and the pod runs on only ONE node. Why?
 # 
-
 # Because in fortune_pod.yaml, the web-server container mounts the shared volume with readOnly: true:
 # 
 # - name: html
@@ -83,6 +82,7 @@ kubectl get svc -n week8                          # note the 3xxxx port
 kubectl delete service fortune -n week8
 kubectl expose pod fortune -n week8 --type LoadBalancer --name fortune
 kubectl get svc -n week8                          # EXTERNAL-IP stays <pending>
+# http://<worker-1-public-IP>:32312
 # On EKS this provisioned an ELB. kubeadm has no cloud load-balancer integration,
 # so LoadBalancer never completes here — NodePort is the external option. (Week 6 lecture!)
 kubectl delete service fortune -n week8
