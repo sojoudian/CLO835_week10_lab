@@ -204,8 +204,10 @@ resource "aws_instance" "master" {
     volume_size = 32
   }
 
-  # bootstrap.sh (prereqs) + templated kubeadm init + lab manifest staging
-  user_data = "${file("${path.module}/bootstrap.sh")}\n${templatefile("${path.module}/master-init.sh.tftpl", { k8s_token = local.k8s_token })}\n${local.stage_manifests}"
+  # bootstrap.sh (prereqs) + lab manifest staging + templated kubeadm init.
+  # Staging runs BEFORE the kubectl-heavy init so ~/week10 exists even if a
+  # later step fails.
+  user_data = "${file("${path.module}/bootstrap.sh")}\n${local.stage_manifests}\n${templatefile("${path.module}/master-init.sh.tftpl", { k8s_token = local.k8s_token })}"
 
   tags = {
     Name = "week10-k8s-master"

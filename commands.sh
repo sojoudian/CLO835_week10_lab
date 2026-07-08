@@ -17,8 +17,9 @@
 # 0) Verify the cluster (slides: "Cluster is ready")
 ########################################################
 kubectl get nodes -o wide            # masternode + workernode1 + workernode2, all Ready
-kubectl get pods -n kube-system      # flannel + ebs-csi-controller/node pods Running
-kubectl get sc                       # gp2 exists (no "(default)" marker yet — that's Part 3)
+kubectl get pods -n kube-system      # control plane + coredns + kube-proxy + ebs-csi-* pods Running
+kubectl get pods -n kube-flannel     # flannel runs in its OWN namespace — one pod per node
+kubectl get sc                       # kubectl get storageclass - gp2 exists (no "(default)" marker yet — that's Part 3)
 ls ~/week10                          # the lab manifests
 
 ########################################################
@@ -49,6 +50,9 @@ kubectl apply -f ~/week10/fortune_pod.yaml -n week8
 kubectl get all -n week8
 
 kubectl port-forward fortune 8080:80 -n week8     # leave running; use a 2nd SSH session
+
+ssh -i key.pem -L 8080:127.0.0.1:8080 ubuntu@IP
+
 curl http://localhost:8080                        # a fortune; repeat after ~10s — it changes
 
 kubectl exec fortune -it -n week8 -c web-server -- sh
@@ -62,6 +66,18 @@ kubectl expose pod fortune -n week8 --type NodePort --name fortune
 kubectl get svc -n week8                          # note the 3xxxx port
 # Browse http://<WORKER-1-PUBLIC-IP>:<NODEPORT> and http://<WORKER-2-PUBLIC-IP>:<NODEPORT>
 # Both respond, and the pod runs on only ONE node. Why?
+# 
+
+# Because in fortune_pod.yaml, the web-server container mounts the shared volume with readOnly: true:
+# 
+# - name: html
+#   mountPath: /usr/share/nginx/html
+#   readOnly: true
+# 
+# So nginx can serve the files but nothing inside that container can write them — vi's save fails with a read-only filesystem error.
+# The same volume is mounted writable in the other container (html-generator at /var/htdocs), which is why the fortunes keep updating.
+# One volume, two mounts, two permissions: the generator writes, the web server only reads.
+
 
 # Expose via LoadBalancer — observe what happens WITHOUT a cloud LB controller.
 kubectl delete service fortune -n week8
@@ -124,6 +140,8 @@ kubectl run redis-cli --rm -ti --image=redis:3.2.5 --restart=Never -n week9 -- /
 ########################################################
 # WORKSHOP 2 · Part 3 — StatefulSets (kubia)
 ########################################################
+# Make gp2 the DEFAULT StorageClass: PVCs that don't name a class (like the
+# kubia StatefulSet's volumeClaimTemplates below) will now get gp2 automatically.
 kubectl patch storageclass gp2 -p \
   '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 kubectl get sc                                    # gp2 is now "(default)"

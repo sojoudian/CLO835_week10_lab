@@ -58,7 +58,8 @@ terraform apply        # type yes; then wait ~3–5 min while the nodes self-con
 ssh -i your-key.pem ubuntu@<master public IP from terraform output>
 
 kubectl get nodes -o wide          # masternode + workernode1 + workernode2, all Ready
-kubectl get pods -n kube-system    # flannel + ebs-csi-* pods Running
+kubectl get pods -n kube-system    # control plane + coredns + kube-proxy + ebs-csi-* Running
+kubectl get pods -n kube-flannel   # flannel (its own namespace) — one pod per node
 ls ~/week10                        # the staged lab manifests
 ```
 

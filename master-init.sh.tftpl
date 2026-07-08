@@ -21,17 +21,27 @@ chown ubuntu:ubuntu /home/ubuntu/.kube/config
 
 export KUBECONFIG=/etc/kubernetes/admin.conf
 
+# The API server can drop connections briefly right after init (and again when
+# Flannel reconfigures networking). One failed kubectl under `set -e` would kill
+# this whole script, so every apply below retries until it sticks.
+
 # Flannel CNI
-kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+until kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml; do
+  echo "Flannel apply failed; retrying in 10s..."; sleep 10
+done
 
 # AWS EBS CSI driver — replaces the deck's `eksctl create addon aws-ebs-csi-driver`
 # step (no EKS here). It authenticates with the node's LabRole instance profile.
 # Needed by Workshop 2: redis PVC + kubia StatefulSet volumeClaimTemplates.
-kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=master"
+# PINNED to v1.38.1: the master branch ships CSIDriver fields newer than K8s
+# v1.31 accepts (strict decoding error on nodeAllocatableUpdatePeriodSeconds).
+until kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=v1.38.1"; do
+  echo "EBS CSI apply failed; retrying in 10s..."; sleep 10
+done
 
 # 'gp2' StorageClass backed by the CSI driver. Deliberately NOT the default:
 # the lab has students run the `kubectl patch storageclass gp2 ...` step themselves.
-cat <<'EOF' | kubectl apply -f -
+cat >/tmp/gp2-storageclass.yaml <<'EOF'
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
@@ -41,6 +51,9 @@ volumeBindingMode: WaitForFirstConsumer
 parameters:
   type: gp3
 EOF
+until kubectl apply -f /tmp/gp2-storageclass.yaml; do
+  echo "StorageClass apply failed; retrying in 10s..."; sleep 10
+done
 
 # Label workers as they join (background loop, so cloud-init isn't blocked).
 nohup bash -c '
