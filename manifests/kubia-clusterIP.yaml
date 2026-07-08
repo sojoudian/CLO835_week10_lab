@@ -1,0 +1,12 @@
+# Workshop 2, Part 3 — regular ClusterIP service in front of the StatefulSet.
+# Load-balances across kubia-0 and kubia-1 (contrast with the headless service).
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubia-public
+spec:
+  selector:
+    app: kubia
+  ports:
+    - port: 80
+      targetPort: 8080

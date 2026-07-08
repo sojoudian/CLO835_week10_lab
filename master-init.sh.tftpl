@@ -1,0 +1,53 @@
+# === Control-plane init (appended after bootstrap.sh, runs as root via cloud-init) ===
+# Set the hostname first — kubeadm uses it as the Kubernetes node name.
+hostnamectl set-hostname masternode
+echo "127.0.0.1 masternode" >> /etc/hosts
+
+IMDS_TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 300")
+PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
+PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $IMDS_TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)
+
+kubeadm init \
+  --token=${k8s_token} \
+  --token-ttl=0 \
+  --pod-network-cidr=10.244.0.0/16 \
+  --apiserver-advertise-address="$PRIVATE_IP" \
+  --apiserver-cert-extra-sans="$PUBLIC_IP"
+
+# kubeconfig for the ubuntu user (so `kubectl` works after SSH)
+mkdir -p /home/ubuntu/.kube
+cp /etc/kubernetes/admin.conf /home/ubuntu/.kube/config
+chown ubuntu:ubuntu /home/ubuntu/.kube/config
+
+export KUBECONFIG=/etc/kubernetes/admin.conf
+
+# Flannel CNI
+kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+
+# AWS EBS CSI driver — replaces the deck's `eksctl create addon aws-ebs-csi-driver`
+# step (no EKS here). It authenticates with the node's LabRole instance profile.
+# Needed by Workshop 2: redis PVC + kubia StatefulSet volumeClaimTemplates.
+kubectl apply -k "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref=master"
+
+# 'gp2' StorageClass backed by the CSI driver. Deliberately NOT the default:
+# the lab has students run the `kubectl patch storageclass gp2 ...` step themselves.
+cat <<'EOF' | kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp2
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  type: gp3
+EOF
+
+# Label workers as they join (background loop, so cloud-init isn't blocked).
+nohup bash -c '
+  for i in $(seq 1 60); do
+    for node in $(kubectl get nodes -l "!node-role.kubernetes.io/control-plane" -o name 2>/dev/null); do
+      kubectl label "$node" node-role.kubernetes.io/worker="" --overwrite >/dev/null 2>&1
+    done
+    sleep 15
+  done
+' >/var/log/label-workers.log 2>&1 &

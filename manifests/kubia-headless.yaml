@@ -1,0 +1,16 @@
+# Workshop 2, Part 3 — HEADLESS service (clusterIP: None).
+# No virtual IP, no load balancing: DNS returns every pod, and each pod gets
+# its own stable record (kubia-0.kubia.default.svc.cluster.local).
+# Verify with: dig SRV kubia.default.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubia
+spec:
+  clusterIP: None
+  selector:
+    app: kubia
+  ports:
+    - port: 80
+      targetPort: 8080
+      name: http

@@ -1,0 +1,39 @@
+# Workshop 2, Part 3 — StatefulSet with per-pod EBS volumes.
+# volumeClaimTemplates has NO storageClassName on purpose: it uses the DEFAULT
+# StorageClass, which only exists after students run the `kubectl patch
+# storageclass gp2 ... is-default-class` step (deck slide "Deploy statefulset").
+# luksa/kubia-pet (Kubernetes in Action): GET returns the pod's stored data,
+# POST stores the request body in /var/data.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kubia
+spec:
+  serviceName: kubia
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kubia
+  template:
+    metadata:
+      labels:
+        app: kubia
+    spec:
+      containers:
+        - name: kubia
+          image: luksa/kubia-pet
+          ports:
+            - containerPort: 8080
+              name: http
+          volumeMounts:
+            - name: data
+              mountPath: /var/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi

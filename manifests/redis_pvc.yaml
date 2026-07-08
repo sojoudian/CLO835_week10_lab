@@ -1,0 +1,15 @@
+# Workshop 2, Part 2 — PVC dynamically backed by a real Amazon EBS volume.
+# storageClassName is explicit because gp2 is NOT the default StorageClass yet
+# (students make it default later, in Part 3).
+# WaitForFirstConsumer: stays Pending until the redis pod schedules — expected.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp2
+  resources:
+    requests:
+      storage: 1Gi

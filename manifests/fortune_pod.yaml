@@ -1,0 +1,29 @@
+# Workshop 1 — two containers, one pod, shared emptyDir volume.
+# html-generator writes a new fortune to /var/htdocs every 10 seconds;
+# nginx (web-server) serves the same volume READ-ONLY at /usr/share/nginx/html.
+# (That read-only mount is the answer to "Why does the editing attempt fail?")
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortune
+  labels:
+    app: fortune
+spec:
+  containers:
+    - name: html-generator
+      image: luksa/fortune
+      volumeMounts:
+        - name: html
+          mountPath: /var/htdocs
+    - name: web-server
+      image: nginx:alpine
+      ports:
+        - containerPort: 80
+          protocol: TCP
+      volumeMounts:
+        - name: html
+          mountPath: /usr/share/nginx/html
+          readOnly: true
+  volumes:
+    - name: html
+      emptyDir: {}

@@ -1,0 +1,12 @@
+# Workshop 2, Part 2 — ClusterIP service for redis.
+# In-cluster DNS name (from ns week9): redis.week9.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+      targetPort: 6379

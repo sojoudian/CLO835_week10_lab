@@ -1,0 +1,25 @@
+# Workshop 2, Part 1 — MongoDB with a hostPath volume.
+# Data lives in /mnt/mongodb ON THE NODE the pod happens to land on.
+# Delete + recreate the pod: persistence is "hit and miss" — that's the lesson.
+# (mongo:7 ships mongosh — the old `mongo` shell was removed.)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mongodb
+  labels:
+    app: mongodb
+spec:
+  containers:
+    - name: mongodb
+      image: mongo:7
+      ports:
+        - containerPort: 27017
+          protocol: TCP
+      volumeMounts:
+        - name: mongodb-data
+          mountPath: /data/db
+  volumes:
+    - name: mongodb-data
+      hostPath:
+        path: /mnt/mongodb
+        type: DirectoryOrCreate
